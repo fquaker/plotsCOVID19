@@ -1,0 +1,108 @@
+##librerias
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+
+##ldatos$eer datos
+datos<-read.csv("https://covid.ourworldindata.org/data/ecdc/full_data.csv")
+
+#loop
+seleccion<- c("Italy")
+todos<-data.frame()
+tabla_grafico<- data.frame()
+for (i in c(1:length(seleccion))) {
+  
+  ## Criterio de selección interno
+  print(seleccion[i])
+  selector<- seleccion[i]
+  datos_for <- datos[datos$location %in% selector,]
+  datos_for$date<- as.Date(datos_for$date)
+ 
+   ##mas de 5 datos reportados
+  datos_for<- subset(datos_for, total_cases > 30)
+  
+  ## unifico los ceros
+  dia<- as.numeric(datos_for$date)-as.numeric(min(datos_for$date))
+  dia<- data.frame(dia=dia)
+  log_nuevoscasos<- data.frame(log_casos=log10(datos_for$total_cases))
+  
+  ##armo el data frame total
+  datos_for<- data.frame(datos_for,dia, log_nuevoscasos)
+  todos<- rbind(todos,datos_for)
+  
+  ## datos modelo
+  ultimosvalores<- c(10)
+  datosmodelos<- datos_for[c(((nrow(datos_for)-ultimosvalores):nrow(datos_for))),]
+  dumb<-lm(log_casos ~ dia, datosmodelos)
+  tiempopor2<- data.frame(Duplica=round(as.numeric(log10(2)/dumb$coefficients[2]), digits = 2))
+  total_inf<- data.frame(Infectados= max(datos_for$total_cases))
+  total_muertes<- data.frame(Muertes= max(datos_for$total_deaths))
+  pais<- data.frame(Pais=seleccion[i])
+  tabla_dumb<- data.frame(pais, total_inf, total_muertes, tiempopor2)
+  tabla_grafico<- rbind(tabla_grafico, tabla_dumb)
+  }
+  
+
+
+## Diseño tabla
+tablaincluida<- tableGrob(tabla_grafico, rows=NULL, theme = ttheme_default(base_size = 7))
+
+##Grafico Casos totales
+grafico<- ggplot(todos, aes(x=dia, y= total_cases, col = location))+
+  geom_point()+
+  geom_smooth(se=FALSE, linetype= "twodash") +
+  ggtitle(paste("Evolución del COVID19 luego de la detección \n  de los primeros 30 casos")) +
+  labs(subtitle= paste("Fecha =",tail(as.Date(datos$date), n=1)),
+     x="Día",
+     y = "Número de casos reportados") +
+    theme(legend.title = element_blank()) 
+    
+grafico + annotation_custom(tablaincluida, xmin= -10, ymax=1.8*max(todos$total_cases))
+
+##Grafico LOG Casos totales
+grafico_log<- ggplot(todos, aes(x=dia, y= log_casos, col = location))+
+  geom_point()+
+  geom_smooth(se=FALSE, linetype= "twodash") +
+  ggtitle(paste("Evolución del COVID19 (log)")) +
+  labs(subtitle= paste("Fecha =",tail(as.Date(datos$date), n=1)),
+       x="Día",
+       y = "Número de casos reportados (log)") +
+  theme(legend.title = element_blank())
+
+grafico_log
+
+##Grafico nuevos casos
+grafico_nuevos_casos<- ggplot(todos, aes(x=dia, y= new_cases, col = location))+
+  geom_point()+
+  geom_line(linetype= "twodash") +
+  ggtitle(paste("Nuevos casos")) +
+  labs(subtitle= paste("Fecha =",tail(as.Date(datos$date), n=1)),
+       x="Día",
+       y = "Número de casos") +
+  theme(legend.title = element_blank())
+
+grafico_nuevos_casos
+
+##Grafico Muertos totales
+grafico_muertes<- ggplot(todos, aes(x=dia, y= total_deaths, col = location))+
+  geom_point()+
+  geom_smooth(se=FALSE, linetype= "twodash") +
+  ggtitle(paste("Fallecimientos por Covid")) +
+  labs(subtitle= paste("Fecha =",tail(as.Date(datos$date), n=1)),
+       x="Día",
+       y = "Fallecimientos") +
+  theme(legend.title = element_blank())
+
+grafico_muertes
+
+##Grafico Muertos totales (log)
+grafico_muertes_log<- ggplot(todos, aes(x=dia, y= log10(total_deaths), col = location))+
+  geom_point()+
+  geom_smooth(se=FALSE, linetype= "twodash") +
+  ggtitle(paste("Fallecimientos por Covid (LOG)")) +
+  labs(subtitle= paste("Fecha =",tail(as.Date(datos$date), n=1)),
+       x="Día",
+       y = "log Fallecimientos") +
+  theme(legend.title = element_blank())
+
+grafico_muertes_log
